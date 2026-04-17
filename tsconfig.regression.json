@@ -12,7 +12,8 @@
     "sourceMap": false,
     "declaration": false,
     "declarationMap": false,
-    "incremental": false
+    "incremental": false,
+    "allowImportingTsExtensions": false
   },
   "include": [
     "types.ts",

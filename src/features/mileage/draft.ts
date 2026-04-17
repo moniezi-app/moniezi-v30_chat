@@ -1,4 +1,4 @@
-import { MileageTrip } from '../../../types';
+import { MileageTrip } from '../../../types.js';
 
 export type MileageDraft = {
   date: string;

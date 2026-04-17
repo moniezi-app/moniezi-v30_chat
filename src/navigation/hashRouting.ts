@@ -1,4 +1,4 @@
-import { Page } from '../../types';
+import { Page } from '../../types.js';
 
 export type HashNavState = { path: string; params: Record<string, string> };
 

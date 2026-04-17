@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createEmptyMileageDraft, normalizeMileageDraftMiles, toMileageTripPayload } from "../../src/features/mileage/draft";
+import { createEmptyMileageDraft, normalizeMileageDraftMiles, toMileageTripPayload } from "../../src/features/mileage/draft.js";
 
 export function runMileageDraftTests() {
   const fixedDate = new Date("2026-04-16T12:00:00.000Z");

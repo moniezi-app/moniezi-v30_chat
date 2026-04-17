@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { Page } from "../../types";
-import { buildHash, normalizePage, pageToHashPath } from "../../src/navigation/hashRouting";
+import { Page } from "../../types.js";
+import { buildHash, normalizePage, pageToHashPath } from "../../src/navigation/hashRouting.js";
 
 export function runHashRoutingTests() {
   assert.equal(normalizePage("home"), Page.Dashboard);
