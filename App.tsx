@@ -97,6 +97,7 @@ import { AppDrawer } from './src/components/mobile/AppDrawer';
 import { TransactionEditorShell } from './src/features/transactions/TransactionEditorShell';
 import { useKeyboardEditingState } from './src/hooks/useKeyboardEditingState';
 import { useKeyboardSafeScroll } from './src/hooks/useKeyboardSafeScroll';
+import { buildHash, normalizePage, pageToHashPath, parseHashLocation } from './src/navigation/hashRouting';
 // --- Utility: UUID Generator ---
 const generateId = (prefix: string) => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -770,7 +771,7 @@ class PageErrorBoundary extends React.Component<
   }
 }
 
-const CUSTOMER_VERSION = "30.4.1"; // v30 milestone 4.1: lockfile-sync hotfix
+const CUSTOMER_VERSION = "30.4.2"; // v30 milestone 4.1: lockfile-sync hotfix
 const LICENSE_STORAGE_KEY = "moniezi_license_v1";
 const DEVICE_ID_STORAGE_KEY = "moniezi_device_id_v1";
 const OWNER_LICENSE_KEY = "vgkey";
@@ -867,7 +868,6 @@ export default function App() {
     return () => window.removeEventListener('hashchange', syncHashToState);
   }, [syncHashToState]);
 
-  useKeyboardEditingState({ onEditingChange: setIsKeyboardEditing });
 
   const updateHashParams = useCallback(
     (updates: Record<string, string | null | undefined>, opts?: { replace?: boolean; keepPath?: boolean }) => {
@@ -982,6 +982,8 @@ export default function App() {
   const mainScrollRef = useRef<HTMLDivElement>(null);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
   const [isKeyboardEditing, setIsKeyboardEditing] = useState(false);
+
+  useKeyboardEditingState({ onEditingChange: setIsKeyboardEditing });
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
   const [showDeferredInstallCta, setShowDeferredInstallCta] = useState(false);
   const [showIosInstallCta, setShowIosInstallCta] = useState(false);
