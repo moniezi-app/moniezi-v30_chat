@@ -26,7 +26,7 @@ Run these after each mobile-input or layout change.
 - Reports and exports still open from the same flows as before
 
 
-## Release gate for v30.4.0 and later
+## Release gate for v30.4.1 and later
 
 Before shipping a new GitHub version, run:
 

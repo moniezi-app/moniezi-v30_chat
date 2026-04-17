@@ -1,4 +1,4 @@
-# package marker: moniezi-v30.4.0 milestone-4-regression-discipline
+# package marker: moniezi-v30.4.1 milestone-4-lockfile-sync-hotfix
 name: Deploy Vite app to GitHub Pages
 
 on:

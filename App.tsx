@@ -770,7 +770,7 @@ class PageErrorBoundary extends React.Component<
   }
 }
 
-const CUSTOMER_VERSION = "30.4.0"; // v30 milestone 3: static-analysis groundwork
+const CUSTOMER_VERSION = "30.4.1"; // v30 milestone 4.1: lockfile-sync hotfix
 const LICENSE_STORAGE_KEY = "moniezi_license_v1";
 const DEVICE_ID_STORAGE_KEY = "moniezi_device_id_v1";
 const OWNER_LICENSE_KEY = "vgkey";

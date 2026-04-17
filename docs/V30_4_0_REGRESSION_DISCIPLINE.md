@@ -1,4 +1,4 @@
-# MONIEZI v30.4.0 Regression Discipline
+# MONIEZI v30.4.1 Regression Discipline
 
 This milestone adds lightweight automated regression coverage around the extracted stabilization logic without introducing a heavy browser test stack yet.
 
