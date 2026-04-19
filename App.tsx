@@ -98,6 +98,7 @@ import { TransactionEditorShell } from './src/features/transactions/TransactionE
 import { useKeyboardEditingState } from './src/hooks/useKeyboardEditingState';
 import { useKeyboardSafeScroll } from './src/hooks/useKeyboardSafeScroll';
 import { buildHash, normalizePage, pageToHashPath, parseHashLocation } from './src/navigation/hashRouting';
+import { createEmptyMileageDraft, normalizeMileageDraftMiles } from './src/features/mileage/draft';
 // --- Utility: UUID Generator ---
 const generateId = (prefix: string) => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -771,7 +772,7 @@ class PageErrorBoundary extends React.Component<
   }
 }
 
-const CUSTOMER_VERSION = "30.4.4"; // v30.4.4: persistent drawer exit and isolation hotfix
+const CUSTOMER_VERSION = "30.4.5"; // v30.4.5: persistent drawer exit and isolation hotfix
 const LICENSE_STORAGE_KEY = "moniezi_license_v1";
 const DEVICE_ID_STORAGE_KEY = "moniezi_device_id_v1";
 const OWNER_LICENSE_KEY = "vgkey";
@@ -4961,7 +4962,7 @@ const demoMileageTrips: MileageTrip[] = [
 
     clone.querySelectorAll<HTMLElement>('*').forEach((el) => {
       el.style.textRendering = 'geometricPrecision';
-      el.style.webkitFontSmoothing = 'antialiased';
+      el.style.setProperty('-webkit-font-smoothing', 'antialiased');
       const className = typeof el.className === 'string' ? el.className : '';
       if (className.includes('truncate')) {
         el.style.whiteSpace = 'normal';

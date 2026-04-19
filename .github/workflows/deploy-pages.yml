@@ -1,5 +1,6 @@
-# package marker: moniezi-v30.4.4 persistent-drawer-exit-hotfix
+# package marker: moniezi-v30.4.5 persistent-drawer-exit-hotfix
 name: Deploy Vite app to GitHub Pages
+# package-revision: v30.4.5
 
 on:
   push:
