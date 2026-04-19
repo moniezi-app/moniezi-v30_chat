@@ -1,6 +1,6 @@
-# package marker: moniezi-v30.4.5 persistent-drawer-exit-hotfix
+# package marker: moniezi-v30.4.6 pdf-lib-tracked-text-hotfix
 name: Deploy Vite app to GitHub Pages
-# package-revision: v30.4.5
+# package-revision: v30.4.6
 
 on:
   push:

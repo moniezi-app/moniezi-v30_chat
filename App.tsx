@@ -772,7 +772,7 @@ class PageErrorBoundary extends React.Component<
   }
 }
 
-const CUSTOMER_VERSION = "30.4.5"; // v30.4.5: persistent drawer exit and isolation hotfix
+const CUSTOMER_VERSION = "30.4.6"; // v30.4.6: pdf-lib tracked text typecheck hotfix
 const LICENSE_STORAGE_KEY = "moniezi_license_v1";
 const DEVICE_ID_STORAGE_KEY = "moniezi_device_id_v1";
 const OWNER_LICENSE_KEY = "vgkey";
