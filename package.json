@@ -1,7 +1,7 @@
 {
   "name": "moniezi-core",
   "private": true,
-  "version": "30.4.6",
+  "version": "30.4.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run typecheck && npm run test:regression",
-    "test:regression": "rm -rf .tmp/regression-tests && tsc -p tsconfig.regression.json && node .tmp/regression-tests/tests/regression/runAll.js"
+    "test:regression": "rm -rf .tmp/regression-tests && mkdir -p .tmp/regression-tests && printf '{\"type\":\"commonjs\"}\\n' > .tmp/regression-tests/package.json && tsc -p tsconfig.regression.json && node .tmp/regression-tests/tests/regression/runAll.js"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",
