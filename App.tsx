@@ -98,7 +98,7 @@ import { TransactionEditorShell } from './src/features/transactions/TransactionE
 import { useKeyboardEditingState } from './src/hooks/useKeyboardEditingState';
 import { useKeyboardSafeScroll } from './src/hooks/useKeyboardSafeScroll';
 import { buildHash, normalizePage, pageToHashPath, parseHashLocation } from './src/navigation/hashRouting';
-import { createEmptyMileageDraft, normalizeMileageDraftMiles } from './src/features/mileage/draft';
+import { createEmptyMileageDraft, normalizeMileageDraftMiles, toMileageTripPayload } from './src/features/mileage/draft';
 // --- Utility: UUID Generator ---
 const generateId = (prefix: string) => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -1181,7 +1181,7 @@ export default function App() {
   // UI State
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [drawerMode, setDrawerMode] = useState<'add' | 'edit_tx' | 'edit_inv' | 'tax_payments' | 'create_cat'>('add');
+  const [drawerMode, setDrawerMode] = useState<'add' | 'edit_tx' | 'edit_inv' | 'tax_payments' | 'create_cat' | 'mileage'>('add');
   const [activeTab, setActiveTab] = useState<'income' | 'expense' | 'billing'>('income');
   const [showQuickAddMenu, setShowQuickAddMenu] = useState(false);
   const [billingDocType, setBillingDocType] = useState<'invoice' | 'estimate'>('invoice');
@@ -1190,7 +1190,7 @@ export default function App() {
   
   const [categorySearch, setCategorySearch] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
-  const previousDrawerMode = useRef<'add' | 'edit_tx' | 'edit_inv' | 'tax_payments'>('add');
+  const previousDrawerMode = useRef<'add' | 'edit_tx' | 'edit_inv' | 'tax_payments' | 'mileage'>('add');
 
   const [ledgerFilter, setLedgerFilter] = useState<'all' | 'income' | 'expense' | 'invoice'>('all');
   const [lastYearCalc, setLastYearCalc] = useState({ profit: '', tax: '' });
@@ -1251,6 +1251,7 @@ export default function App() {
   const [auditMissingDelta, setAuditMissingDelta] = useState<number>(0);
   const [auditMissingPulse, setAuditMissingPulse] = useState<boolean>(false);
   const [newTrip, setNewTrip] = useState(() => createEmptyMileageDraft());
+  const [editingMileageTripId, setEditingMileageTripId] = useState<string | null>(null);
   const taxSnapshotRef = useRef<HTMLDivElement>(null);
 
   // Reports screen menu (Settings-style tiles)
@@ -2978,6 +2979,34 @@ export default function App() {
     }
   };
 
+  const closeDrawer = () => {
+    setIsDrawerOpen(false);
+    if (drawerMode === 'mileage') {
+      setEditingMileageTripId(null);
+      setNewTrip(createEmptyMileageDraft());
+    }
+  };
+
+  const openMileageAddDrawer = () => {
+    setEditingMileageTripId(null);
+    setNewTrip(createEmptyMileageDraft());
+    setDrawerMode('mileage');
+    setIsDrawerOpen(true);
+  };
+
+  const openMileageEditDrawer = (trip: MileageTrip) => {
+    setEditingMileageTripId(trip.id);
+    setNewTrip({
+      date: trip.date,
+      miles: String(trip.miles ?? ''),
+      purpose: trip.purpose || '',
+      client: trip.client || '',
+      notes: trip.notes || '',
+    });
+    setDrawerMode('mileage');
+    setIsDrawerOpen(true);
+  };
+
   const handleOpenFAB = (
     type: 'income' | 'expense' | 'billing' = 'income',
     billingType?: 'invoice' | 'estimate'
@@ -3026,6 +3055,11 @@ export default function App() {
       return;
     }
 
+    if (currentPage === Page.Mileage) {
+      openMileageAddDrawer();
+      return;
+    }
+
     const fabType = getHeaderFabType();
     handleOpenFAB(fabType, fabType === 'billing' ? 'invoice' : undefined);
   };
@@ -3058,11 +3092,7 @@ export default function App() {
     }
 
     if (action === 'mileage') {
-      setNewTrip(createEmptyMileageDraft());
-      setCurrentPage(Page.Mileage);
-      requestAnimationFrame(() => {
-        forceResetMainViewport();
-      });
+      openMileageAddDrawer();
       return;
     }
 
@@ -3729,23 +3759,48 @@ const demoMileageTrips: MileageTrip[] = [
   };
 
   // --- Mileage Trips ---
-  const addMileageTrip = (trip: Omit<MileageTrip, 'id'>) => {
-    if (!trip.date) return showToast('Please select a date', 'error');
-    if (!trip.purpose?.trim()) return showToast('Please enter a purpose', 'error');
-    if (!trip.miles || Number(trip.miles) <= 0) return showToast('Please enter valid miles', 'error');
-    const newTripEntry: MileageTrip = { id: generateId('mi'), ...trip, miles: Number(trip.miles) };
-    setMileageTrips(prev => [newTripEntry, ...prev]);
+  const saveMileageTripFromDrawer = () => {
+    const draft = { ...newTrip, miles: normalizeMileageDraftMiles(newTrip.miles) };
+    const miles = Number(draft.miles);
+
+    if (!draft.date) return showToast('Please select a date', 'error');
+    if (!draft.purpose.trim()) return showToast('Please enter a purpose', 'error');
+    if (!Number.isFinite(miles) || miles <= 0) return showToast('Please enter valid miles', 'error');
+
+    const payload = toMileageTripPayload({
+      ...draft,
+      purpose: draft.purpose.trim(),
+      client: draft.client.trim(),
+      notes: draft.notes.trim(),
+    });
+    const normalizedPayload: Omit<MileageTrip, 'id'> = {
+      ...payload,
+      miles,
+      client: payload.client?.trim() || undefined,
+      notes: payload.notes?.trim() || undefined,
+    };
+
+    if (editingMileageTripId) {
+      setMileageTrips(prev => prev.map(t => t.id === editingMileageTripId ? ({ ...t, ...normalizedPayload } as MileageTrip) : t));
+      showToast('Mileage trip updated', 'success');
+    } else {
+      const newTripEntry: MileageTrip = { id: generateId('mi'), ...normalizedPayload };
+      setMileageTrips(prev => [newTripEntry, ...prev]);
+      showToast('Mileage trip saved', 'success');
+    }
+
     setNewTrip(createEmptyMileageDraft());
-    showToast('Mileage trip saved', 'success');
+    setEditingMileageTripId(null);
+    setIsDrawerOpen(false);
   };
 
-  const updateMileageTrip = (id: string, patch: Partial<MileageTrip>) => {
-    setMileageTrips(prev => prev.map(t => t.id === id ? ({ ...t, ...patch, miles: patch.miles !== undefined ? Number(patch.miles) : t.miles } as MileageTrip) : t));
-  };
-
-  const deleteMileageTrip = (id: string) => {
+  const deleteActiveMileageTrip = () => {
+    if (!editingMileageTripId) return;
     if (!confirm('Delete this mileage trip?')) return;
-    setMileageTrips(prev => prev.filter(t => t.id !== id));
+    setMileageTrips(prev => prev.filter(t => t.id !== editingMileageTripId));
+    setNewTrip(createEmptyMileageDraft());
+    setEditingMileageTripId(null);
+    setIsDrawerOpen(false);
     showToast('Mileage trip deleted', 'info');
   };
 
@@ -4326,6 +4381,15 @@ const demoMileageTrips: MileageTrip[] = [
   const mileageForTaxYear = useMemo(() => {
     return mileageTrips.filter(t => new Date(t.date).getFullYear() === taxPrepYear);
   }, [mileageTrips, taxPrepYear]);
+
+  const mileageTotalMilesForTaxYear = useMemo(() => {
+    return mileageForTaxYear.reduce((sum, trip) => sum + Number(trip.miles || 0), 0);
+  }, [mileageForTaxYear]);
+
+  const mileageDeductionForTaxYear = useMemo(() => {
+    const rateUsd = Number(settings.mileageRateCents ?? 72.5) / 100;
+    return mileageTotalMilesForTaxYear * rateUsd;
+  }, [mileageTotalMilesForTaxYear, settings.mileageRateCents]);
 
   const getTaxLedgerExportRows = () => {
     return txForTaxYear
@@ -5941,6 +6005,52 @@ const demoMileageTrips: MileageTrip[] = [
                </div>
             </div>
          </div>
+      </div>
+    );
+  };
+
+  const renderMileageTripList = (emptyLabel = `No mileage trips for ${taxPrepYear}.`) => {
+    const sortedTrips = mileageForTaxYear.slice().sort((a, b) => b.date.localeCompare(a.date));
+
+    if (sortedTrips.length === 0) {
+      return (
+        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 p-6 text-center text-sm font-semibold text-slate-500 dark:text-slate-400">
+          {emptyLabel}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3">
+        {sortedTrips.map(trip => {
+          const displayDate = trip.date ? new Date(`${trip.date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No date';
+          return (
+            <button
+              key={trip.id}
+              type="button"
+              onClick={() => openMileageEditDrawer(trip)}
+              className="w-full text-left rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800/80 active:scale-[0.99] transition-all"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{trip.purpose || 'Mileage trip'}</div>
+                  <div className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">{displayDate}</div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <div className="text-base font-black text-slate-900 dark:text-white">{Number(trip.miles || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+                  <div className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 dark:text-slate-400">Miles</div>
+                </div>
+              </div>
+              {(trip.client || trip.notes) && (
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  {trip.client ? <div className="truncate"><span className="font-extrabold text-slate-700 dark:text-slate-200">Client:</span> {trip.client}</div> : null}
+                  {trip.notes ? <div className="truncate"><span className="font-extrabold text-slate-700 dark:text-slate-200">Notes:</span> {trip.notes}</div> : null}
+                </div>
+              )}
+              <div className="mt-3 text-[10px] font-extrabold uppercase tracking-widest text-blue-600 dark:text-blue-400">Tap to edit</div>
+            </button>
+          );
+        })}
       </div>
     );
   };
@@ -7766,9 +7876,8 @@ html, body, #root {
               </p>
             )}
 
-            {/* Mileage Tracker (promoted to its own bottom-tab page) */}
             <MobileFormShell
-              isEditing={isMileageKeyboardEditing}
+              isEditing={false}
               title="Mileage"
               description="Track deductible trips and export clean CSV or spreadsheet files for your accountant."
               toolbar={(
@@ -7779,83 +7888,30 @@ html, body, #root {
                       {[2026, 2025, 2024, 2023].map(y => (<option key={y} value={y}>{y}</option>))}
                     </select>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button type="button" onClick={openMileageAddDrawer} className="w-full text-center px-4 py-3 rounded-lg bg-emerald-600 text-white font-extrabold uppercase tracking-widest text-xs hover:bg-emerald-700 active:scale-95 transition-all">Add Trip</button>
                     <button onClick={handleExportMileageSpreadsheet} className={`${exportButtonTonalClass} w-full text-center`}>Export Mileage Spreadsheet</button>
                     <button onClick={handleExportMileageCSV} className={`${exportButtonUtilityClass} w-full text-center`}>Export Mileage CSV</button>
                   </div>
                 </div>
               )}
               form={(
-                <div className="grid grid-cols-1 md:grid-cols-8 gap-3 items-end">
-                  <div className="md:col-span-2">
-                    <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 block">Date</label>
-                    <input type="date" value={newTrip.date} onChange={e => setNewTrip((p: any) => ({ ...p, date: e.target.value }))} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-bold" />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-4">
+                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Trips</div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{mileageForTaxYear.length}</div>
                   </div>
-                  <div className="md:col-span-1">
-                    <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 block">Miles</label>
-                    <input type="number" inputMode="decimal" enterKeyHint="done" step="0.1" value={newTrip.miles} onChange={e => setNewTrip((p: any) => ({ ...p, miles: e.target.value }))} onBlur={e => setNewTrip((p: any) => ({ ...p, miles: normalizeMileageDraftMiles(e.target.value) }))} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-bold" placeholder="0" />
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-4">
+                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Miles</div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{mileageTotalMilesForTaxYear.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
                   </div>
-                  <div className="md:col-span-3">
-                    <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 block">Purpose</label>
-                    <input type="text" value={newTrip.purpose} onChange={e => setNewTrip((p: any) => ({ ...p, purpose: e.target.value }))} placeholder="Client meeting, supply run, airport, etc." className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-bold" />
-                  </div>
-                  <div className="md:col-span-5 flex items-center justify-between gap-3">
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 block">Client (optional)</label>
-                        <input type="text" value={newTrip.client} onChange={e => setNewTrip((p: any) => ({ ...p, client: e.target.value }))} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-bold" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 block">Notes (optional)</label>
-                        <input type="text" value={newTrip.notes} onChange={e => setNewTrip((p: any) => ({ ...p, notes: e.target.value }))} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-bold" />
-                      </div>
-                    </div>
-                    <button onClick={() => addMileageTrip({ date: newTrip.date, miles: Number(newTrip.miles), purpose: newTrip.purpose, client: newTrip.client || undefined, notes: newTrip.notes || undefined })} className="px-5 py-3 rounded-lg bg-emerald-600 text-white font-extrabold uppercase tracking-widest text-xs hover:bg-emerald-700 active:scale-95 transition-all whitespace-nowrap">Add Trip</button>
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-4">
+                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Estimated Deduction</div>
+                    <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{formatCurrency.format(mileageDeductionForTaxYear)}</div>
                   </div>
                 </div>
               )}
-              secondaryContent={(
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
-                        <th className="py-2 pr-4">Date</th>
-                        <th className="py-2 pr-4">Miles</th>
-                        <th className="py-2 pr-4">Purpose</th>
-                        <th className="py-2 pr-4">Client</th>
-                        <th className="py-2 pr-4">Notes</th>
-                        <th className="py-2 pr-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mileageForTaxYear.length === 0 ? (
-                        <tr><td colSpan={6} className="py-4 text-slate-500 dark:text-slate-400">No mileage trips for {taxPrepYear}.</td></tr>
-                      ) : mileageForTaxYear.slice().sort((a,b) => b.date.localeCompare(a.date)).map(trip => (
-                        <tr key={trip.id} className="border-b border-slate-200/60 dark:border-slate-800/60">
-                          <td className="py-2 pr-4">
-                            <input type="date" value={trip.date} onChange={e => updateMileageTrip(trip.id, { date: e.target.value })} className="bg-transparent border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-sm font-bold" />
-                          </td>
-                          <td className="py-2 pr-4">
-                            <input type="number" inputMode="decimal" enterKeyHint="done" step="0.1" value={trip.miles} onChange={e => updateMileageTrip(trip.id, { miles: Number(e.target.value) })} className="w-24 bg-transparent border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-sm font-bold" />
-                          </td>
-                          <td className="py-2 pr-4">
-                            <input type="text" value={trip.purpose} onChange={e => updateMileageTrip(trip.id, { purpose: e.target.value })} className="w-64 bg-transparent border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-sm font-bold" />
-                          </td>
-                          <td className="py-2 pr-4">
-                            <input type="text" value={trip.client || ''} onChange={e => updateMileageTrip(trip.id, { client: e.target.value })} className="w-40 bg-transparent border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-sm font-bold" />
-                          </td>
-                          <td className="py-2 pr-4">
-                            <input type="text" value={trip.notes || ''} onChange={e => updateMileageTrip(trip.id, { notes: e.target.value })} className="w-48 bg-transparent border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-sm font-bold" />
-                          </td>
-                          <td className="py-2 pr-4 text-right">
-                            <button onClick={() => deleteMileageTrip(trip.id)} className="px-3 py-2 rounded-lg bg-red-600 text-white font-extrabold uppercase tracking-widest text-xs hover:bg-red-700 active:scale-95 transition-all">Delete</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              secondaryContent={renderMileageTripList()}
             />
           </div>
         )}
@@ -8206,84 +8262,35 @@ html, body, #root {
 
                 {/* Mileage Tracker */}
                 <div id="report-mileage" className="bg-white dark:bg-slate-950 p-5 sm:p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-                      <Truck size={20} strokeWidth={2} />
-                    </div>
-                    <div>
-                      <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white">Mileage</h3>
-                      <p className="text-sm text-slate-600 dark:text-slate-300">Track business miles and export for tax prep.</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                    <div className="md:col-span-1">
-                      <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 block">Date</label>
-                      <input type="date" value={newTrip.date} onChange={e => setNewTrip((p: any) => ({ ...p, date: e.target.value }))} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-bold" />
-                    </div>
-                    <div className="md:col-span-1">
-                      <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 block">Miles</label>
-                      <input type="number" inputMode="decimal" enterKeyHint="done" step="0.1" value={newTrip.miles} onChange={e => setNewTrip((p: any) => ({ ...p, miles: e.target.value }))} onBlur={e => setNewTrip((p: any) => ({ ...p, miles: normalizeMileageDraftMiles(e.target.value) }))} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-bold" />
-                    </div>
-                    <div className="md:col-span-3">
-                      <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 block">Purpose</label>
-                      <input type="text" value={newTrip.purpose} onChange={e => setNewTrip((p: any) => ({ ...p, purpose: e.target.value }))} placeholder="Client meeting, supply run, airport, etc." className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-bold" />
-                    </div>
-                    <div className="md:col-span-5 flex items-center justify-between gap-3">
-                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 block">Client (optional)</label>
-                          <input type="text" value={newTrip.client} onChange={e => setNewTrip((p: any) => ({ ...p, client: e.target.value }))} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-bold" />
-                        </div>
-                        <div>
-                          <label className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 block">Notes (optional)</label>
-                          <input type="text" value={newTrip.notes} onChange={e => setNewTrip((p: any) => ({ ...p, notes: e.target.value }))} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-bold" />
-                        </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+                        <Truck size={20} strokeWidth={2} />
                       </div>
-                      <button onClick={() => addMileageTrip({ date: newTrip.date, miles: Number(newTrip.miles), purpose: newTrip.purpose, client: newTrip.client || undefined, notes: newTrip.notes || undefined })} className="px-5 py-3 rounded-lg bg-emerald-600 text-white font-extrabold uppercase tracking-widest text-xs hover:bg-emerald-700 active:scale-95 transition-all whitespace-nowrap">Add Trip</button>
+                      <div>
+                        <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white">Mileage</h3>
+                        <p className="text-sm text-slate-600 dark:text-slate-300">Track business miles and export for tax prep.</p>
+                      </div>
+                    </div>
+                    <button type="button" onClick={openMileageAddDrawer} className="px-5 py-3 rounded-lg bg-emerald-600 text-white font-extrabold uppercase tracking-widest text-xs hover:bg-emerald-700 active:scale-95 transition-all whitespace-nowrap">Add Trip</button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-4">
+                      <div className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Trips</div>
+                      <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{mileageForTaxYear.length}</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-4">
+                      <div className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Miles</div>
+                      <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{mileageTotalMilesForTaxYear.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 p-4">
+                      <div className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Estimated Deduction</div>
+                      <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">{formatCurrency.format(mileageDeductionForTaxYear)}</div>
                     </div>
                   </div>
 
-                  <div className="mt-6 overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
-                          <th className="py-2 pr-4">Date</th>
-                          <th className="py-2 pr-4">Miles</th>
-                          <th className="py-2 pr-4">Purpose</th>
-                          <th className="py-2 pr-4">Client</th>
-                          <th className="py-2 pr-4">Notes</th>
-                          <th className="py-2 pr-4 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {mileageForTaxYear.length === 0 ? (
-                          <tr><td colSpan={6} className="py-4 text-slate-500 dark:text-slate-400">No mileage trips for {taxPrepYear}.</td></tr>
-                        ) : mileageForTaxYear.slice().sort((a,b) => b.date.localeCompare(a.date)).map(trip => (
-                          <tr key={trip.id} className="border-b border-slate-200/60 dark:border-slate-800/60">
-                            <td className="py-2 pr-4">
-                              <input type="date" value={trip.date} onChange={e => updateMileageTrip(trip.id, { date: e.target.value })} className="bg-transparent border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-sm font-bold" />
-                            </td>
-                            <td className="py-2 pr-4">
-                              <input type="number" inputMode="decimal" enterKeyHint="done" step="0.1" value={trip.miles} onChange={e => updateMileageTrip(trip.id, { miles: Number(e.target.value) })} className="w-24 bg-transparent border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-sm font-bold" />
-                            </td>
-                            <td className="py-2 pr-4">
-                              <input type="text" value={trip.purpose} onChange={e => updateMileageTrip(trip.id, { purpose: e.target.value })} className="w-64 bg-transparent border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-sm font-bold" />
-                            </td>
-                            <td className="py-2 pr-4">
-                              <input type="text" value={trip.client || ''} onChange={e => updateMileageTrip(trip.id, { client: e.target.value })} className="w-40 bg-transparent border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-sm font-bold" />
-                            </td>
-                            <td className="py-2 pr-4">
-                              <input type="text" value={trip.notes || ''} onChange={e => updateMileageTrip(trip.id, { notes: e.target.value })} className="w-48 bg-transparent border border-slate-200 dark:border-slate-800 rounded-md px-2 py-1 text-sm font-bold" />
-                            </td>
-                            <td className="py-2 pr-4 text-right">
-                              <button onClick={() => deleteMileageTrip(trip.id)} className="px-3 py-2 rounded-lg bg-red-600 text-white font-extrabold uppercase tracking-widest text-xs hover:bg-red-700 active:scale-95 transition-all">Delete</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  {renderMileageTripList()}
                 </div>
 
 <div id="report-planner" className="bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200/60 dark:border-slate-800 shadow-lg rounded-3xl p-6 relative overflow-hidden">
@@ -10399,10 +10406,11 @@ html, body, #root {
 
       <AppDrawer
          isOpen={isDrawerOpen}
-         onClose={() => setIsDrawerOpen(false)}
+         onClose={closeDrawer}
          title={
             drawerMode === 'tax_payments' ? 'Tax Payments' :
             drawerMode === 'create_cat' ? 'New Category' :
+            drawerMode === 'mileage' ? (editingMileageTripId ? 'Edit Mileage Trip' : 'Add Mileage Trip') :
             drawerMode === 'add' ? (activeTab === 'billing' ? (billingDocType === 'estimate' ? 'New Estimate' : 'New Invoice') : activeTab === 'income' ? 'Add Income' : 'Add Expense') : 
             drawerMode === 'edit_tx' ? 'Edit Transaction' : 
             drawerMode === 'edit_inv' ? (billingDocType === 'estimate' ? 'Edit Estimate' : 'Edit Invoice') :
@@ -10421,6 +10429,32 @@ html, body, #root {
                     <button onClick={saveTaxPayment} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 uppercase tracking-widest transition-all active:scale-95">Record Payment</button>
                 </div>
                 <div><h4 className="text-sm font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-3 pl-1">Payment History</h4>{taxPayments.length === 0 ? (<div className="text-center py-8 text-slate-400 italic text-sm">No payments recorded yet.</div>) : (<div className="space-y-3">{taxPayments.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(p => (<div key={p.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center"><CheckCircle size={18} /></div><div><div className="font-bold text-slate-900 dark:text-white">{p.type} Tax</div><div className="text-xs text-slate-500">{p.date}</div></div></div><div className="text-right"><div className="font-bold text-slate-900 dark:text-white">{formatCurrency.format(p.amount)}</div><button onClick={() => deleteTaxPayment(p.id)} className="text-xs text-red-500 hover:text-red-600 mt-1 font-bold">DELETE</button></div></div>))}</div>)}</div>
+             </div>
+         ) : drawerMode === 'mileage' ? (
+             <div className="space-y-5">
+                <DateInput label="Date" value={newTrip.date} onChange={v => setNewTrip(p => ({ ...p, date: v }))} />
+                <div>
+                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2 block pl-1">Miles</label>
+                  <input type="number" inputMode="decimal" enterKeyHint="done" step="0.1" value={newTrip.miles} onChange={e => setNewTrip(p => ({ ...p, miles: e.target.value }))} onBlur={e => setNewTrip(p => ({ ...p, miles: normalizeMileageDraftMiles(e.target.value) }))} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-4 font-bold text-lg outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white" placeholder="0" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2 block pl-1">Purpose</label>
+                  <input type="text" value={newTrip.purpose} onChange={e => setNewTrip(p => ({ ...p, purpose: e.target.value }))} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-4 font-bold text-base outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white" placeholder="Client meeting, supply run, airport, etc." />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2 block pl-1">Client</label>
+                  <input type="text" value={newTrip.client} onChange={e => setNewTrip(p => ({ ...p, client: e.target.value }))} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-4 font-bold text-base outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white" placeholder="Optional" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-2 block pl-1">Notes</label>
+                  <textarea value={newTrip.notes} onChange={e => setNewTrip(p => ({ ...p, notes: e.target.value }))} className="w-full min-h-[96px] bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-4 font-bold text-base outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white" placeholder="Optional" />
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  {editingMileageTripId ? (
+                    <button type="button" onClick={deleteActiveMileageTrip} className="sm:w-40 py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-lg shadow-red-500/20 uppercase tracking-widest transition-all active:scale-95">Delete</button>
+                  ) : null}
+                  <button type="button" onClick={saveMileageTripFromDrawer} className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow-lg shadow-emerald-500/20 uppercase tracking-widest transition-all active:scale-95">Save Trip</button>
+                </div>
              </div>
          ) : drawerMode === 'create_cat' ? (
              <div className="space-y-6">
@@ -10774,7 +10808,7 @@ html, body, #root {
               <button onClick={() => handleQuickAddSelection('mileage')} className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-4 text-left transition-all active:scale-[0.98] hover:bg-slate-100 shadow-sm dark:border-slate-600 dark:bg-slate-800/95 dark:hover:bg-slate-800">
                 <div className="qa-tile-copy">
                   <div className={theme === 'dark' ? 'qa-tile-title text-white' : 'qa-tile-title text-slate-950'}>Mileage</div>
-                  <div className={theme === 'dark' ? 'qa-tile-desc text-slate-50' : 'qa-tile-desc text-slate-900'}>Go to the mileage tracker.</div>
+                  <div className={theme === 'dark' ? 'qa-tile-desc text-slate-50' : 'qa-tile-desc text-slate-900'}>Log a business trip.</div>
                 </div>
               </button>
               <button onClick={() => handleQuickAddSelection('client')} className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-4 text-left transition-all active:scale-[0.98] hover:bg-slate-100 shadow-sm dark:border-slate-600 dark:bg-slate-800/95 dark:hover:bg-slate-800">
