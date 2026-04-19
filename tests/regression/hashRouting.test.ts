@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+import * as assert from "node:assert/strict";
 import { Page } from "../../types";
 import { buildHash, normalizePage, pageToHashPath } from "../../src/navigation/hashRouting";
 

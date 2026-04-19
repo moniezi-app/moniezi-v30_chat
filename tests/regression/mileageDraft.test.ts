@@ -1,4 +1,4 @@
-import assert from "node:assert/strict";
+import * as assert from "node:assert/strict";
 import { createEmptyMileageDraft, normalizeMileageDraftMiles, toMileageTripPayload } from "../../src/features/mileage/draft";
 
 export function runMileageDraftTests() {

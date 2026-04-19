@@ -1,6 +1,6 @@
-# package marker: moniezi-v30.4.7 regression-tsconfig-hotfix
+# package marker: moniezi-v30.4.9 repo-wide-stabilization-hotfix
 name: Deploy Vite app to GitHub Pages
-# package-revision: v30.4.7
+# package-revision: v30.4.9
 
 on:
   push:

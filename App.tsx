@@ -225,7 +225,7 @@ const downloadReceiptToDevice = (dataUrl: string) => {
         link.href = dataUrl;
         const now = new Date();
         // Format: Receipt_YYYY-MM-DD_HHMMSS
-        const timestamp = now.toISOString().replace(/[-:T.]/g, '').slice(0, 14); 
+        const timestamp = now.toISOString().replace(/-/g, '').replace(/:/g, '').replace('T', '').replace(/\./g, '').slice(0, 14); 
         const dateStr = now.toISOString().split('T')[0];
         
         // Attempt to place in BizReceipts folder (Browser support varies, might fallback to filename prefix)
