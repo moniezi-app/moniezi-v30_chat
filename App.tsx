@@ -98,7 +98,6 @@ import { TransactionEditorShell } from './src/features/transactions/TransactionE
 import { useKeyboardEditingState } from './src/hooks/useKeyboardEditingState';
 import { useKeyboardSafeScroll } from './src/hooks/useKeyboardSafeScroll';
 import { buildHash, normalizePage, pageToHashPath, parseHashLocation } from './src/navigation/hashRouting';
-import { createEmptyMileageDraft, normalizeMileageDraftMiles, toMileageTripPayload } from './src/features/mileage/draft';
 // --- Utility: UUID Generator ---
 const generateId = (prefix: string) => {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -772,7 +771,7 @@ class PageErrorBoundary extends React.Component<
   }
 }
 
-const CUSTOMER_VERSION = "30.4.3"; // v30 milestone 4.3: stability, asset typing, and regression-runner hotfix
+const CUSTOMER_VERSION = "30.4.4"; // v30.4.4: persistent drawer exit and isolation hotfix
 const LICENSE_STORAGE_KEY = "moniezi_license_v1";
 const DEVICE_ID_STORAGE_KEY = "moniezi_device_id_v1";
 const OWNER_LICENSE_KEY = "vgkey";
@@ -4962,7 +4961,7 @@ const demoMileageTrips: MileageTrip[] = [
 
     clone.querySelectorAll<HTMLElement>('*').forEach((el) => {
       el.style.textRendering = 'geometricPrecision';
-      el.style.setProperty('-webkit-font-smoothing', 'antialiased');
+      el.style.webkitFontSmoothing = 'antialiased';
       const className = typeof el.className === 'string' ? el.className : '';
       if (className.includes('truncate')) {
         el.style.whiteSpace = 'normal';
@@ -7810,7 +7809,7 @@ html, body, #root {
                         <input type="text" value={newTrip.notes} onChange={e => setNewTrip((p: any) => ({ ...p, notes: e.target.value }))} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-bold" />
                       </div>
                     </div>
-                    <button onClick={() => addMileageTrip(toMileageTripPayload(newTrip))} className="px-5 py-3 rounded-lg bg-emerald-600 text-white font-extrabold uppercase tracking-widest text-xs hover:bg-emerald-700 active:scale-95 transition-all whitespace-nowrap">Add Trip</button>
+                    <button onClick={() => addMileageTrip({ date: newTrip.date, miles: Number(newTrip.miles), purpose: newTrip.purpose, client: newTrip.client || undefined, notes: newTrip.notes || undefined })} className="px-5 py-3 rounded-lg bg-emerald-600 text-white font-extrabold uppercase tracking-widest text-xs hover:bg-emerald-700 active:scale-95 transition-all whitespace-nowrap">Add Trip</button>
                   </div>
                 </div>
               )}
@@ -8240,7 +8239,7 @@ html, body, #root {
                           <input type="text" value={newTrip.notes} onChange={e => setNewTrip((p: any) => ({ ...p, notes: e.target.value }))} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-bold" />
                         </div>
                       </div>
-                      <button onClick={() => addMileageTrip(toMileageTripPayload(newTrip))} className="px-5 py-3 rounded-lg bg-emerald-600 text-white font-extrabold uppercase tracking-widest text-xs hover:bg-emerald-700 active:scale-95 transition-all whitespace-nowrap">Add Trip</button>
+                      <button onClick={() => addMileageTrip({ date: newTrip.date, miles: Number(newTrip.miles), purpose: newTrip.purpose, client: newTrip.client || undefined, notes: newTrip.notes || undefined })} className="px-5 py-3 rounded-lg bg-emerald-600 text-white font-extrabold uppercase tracking-widest text-xs hover:bg-emerald-700 active:scale-95 transition-all whitespace-nowrap">Add Trip</button>
                     </div>
                   </div>
 

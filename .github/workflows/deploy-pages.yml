@@ -1,4 +1,4 @@
-# package marker: moniezi-v30.4.3 milestone-4-stability-regression-hotfix
+# package marker: moniezi-v30.4.4 persistent-drawer-exit-hotfix
 name: Deploy Vite app to GitHub Pages
 
 on:

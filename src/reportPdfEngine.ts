@@ -128,36 +128,6 @@ const splitLines = (text: string, font: PDFFont, size: number, maxWidth: number)
   return lines;
 };
 
-const trackedTextWidth = (text: string, font: PDFFont, size: number, tracking = 0) => {
-  const safeText = sanitizePdfText(text);
-  if (!safeText) return 0;
-  return font.widthOfTextAtSize(safeText, size) + Math.max(0, safeText.length - 1) * tracking;
-};
-
-const drawTrackedText = (
-  page: PDFPage,
-  text: string,
-  x: number,
-  y: number,
-  font: PDFFont,
-  size: number,
-  color = COLORS.inkSoft,
-  tracking = 0,
-) => {
-  const safeText = sanitizePdfText(text);
-  if (!safeText) return;
-  if (!tracking) {
-    page.drawText(safeText, { x, y, size, font, color });
-    return;
-  }
-
-  let cursorX = x;
-  for (const glyph of safeText) {
-    page.drawText(glyph, { x: cursorX, y, size, font, color });
-    cursorX += font.widthOfTextAtSize(glyph, size) + tracking;
-  }
-};
-
 const textBlockHeight = (text: string, font: PDFFont, size: number, width: number, lineGap = 4) => {
   const lines = splitLines(text, font, size, width);
   return lines.length * size + Math.max(0, lines.length - 1) * lineGap;
@@ -204,7 +174,14 @@ const drawInfoBox = (
   height = 46,
 ) => {
   page.drawRectangle({ x, y: yTop - height, width, height, color: COLORS.panelStrong, borderColor: COLORS.panelBorder, borderWidth: 1 });
-  drawTrackedText(page, sanitizePdfText(label).toUpperCase(), x + 12, yTop - 16, fonts.bold, 7.2, COLORS.inkSoft, 1.2);
+  page.drawText(sanitizePdfText(label).toUpperCase(), {
+    x: x + 12,
+    y: yTop - 16,
+    size: 7.2,
+    font: fonts.bold,
+    color: COLORS.inkSoft,
+    characterSpacing: 1.2,
+  });
   const valueLines = splitLines(value, fonts.bold, 10.5, width - 24).slice(0, 2);
   let lineY = yTop - 31;
   valueLines.forEach(line => {
@@ -225,7 +202,14 @@ const drawMetricCard = (
   fonts: FontSet,
 ) => {
   page.drawRectangle({ x, y: yTop - height, width, height, color: COLORS.white, borderColor: COLORS.panelBorder, borderWidth: 1 });
-  drawTrackedText(page, sanitizePdfText(label).toUpperCase(), x + 14, yTop - 18, fonts.bold, 7.1, COLORS.inkSoft, 1.2);
+  page.drawText(sanitizePdfText(label).toUpperCase(), {
+    x: x + 14,
+    y: yTop - 18,
+    size: 7.1,
+    font: fonts.bold,
+    color: COLORS.inkSoft,
+    characterSpacing: 1.2,
+  });
   page.drawText(sanitizePdfText(value), {
     x: x + 14,
     y: yTop - 43,
@@ -249,7 +233,14 @@ const drawSectionCard = (
 ) => {
   page.drawRectangle({ x, y: yTop - height, width, height, color: COLORS.white, borderColor: COLORS.panelBorder, borderWidth: 1 });
   page.drawRectangle({ x, y: yTop - SECTION_HEADER_HEIGHT, width, height: SECTION_HEADER_HEIGHT, color: COLORS.panel });
-  drawTrackedText(page, `SECTION ${sanitizePdfText(sectionNo)}`, x + SECTION_INSET, yTop - 20, fonts.bold, 8.1, COLORS.blue, 1.4);
+  page.drawText(`SECTION ${sanitizePdfText(sectionNo)}`, {
+    x: x + SECTION_INSET,
+    y: yTop - 20,
+    size: 8.1,
+    font: fonts.bold,
+    color: COLORS.blue,
+    characterSpacing: 1.4,
+  });
   page.drawText(sanitizePdfText(title), {
     x: x + SECTION_INSET,
     y: yTop - 42,
@@ -307,7 +298,14 @@ const drawMiniStat = (
   height = 72,
 ) => {
   page.drawRectangle({ x, y: yTop - height, width, height, color: COLORS.white, borderColor: COLORS.panelBorder, borderWidth: 1 });
-  drawTrackedText(page, sanitizePdfText(label).toUpperCase(), x + 12, yTop - 18, fonts.bold, 7.1, COLORS.inkSoft, 1.1);
+  page.drawText(sanitizePdfText(label).toUpperCase(), {
+    x: x + 12,
+    y: yTop - 18,
+    size: 7.1,
+    font: fonts.bold,
+    color: COLORS.inkSoft,
+    characterSpacing: 1.1,
+  });
   page.drawText(sanitizePdfText(value), {
     x: x + 12,
     y: yTop - 41,
@@ -334,10 +332,9 @@ const drawTable = (
   let colX = x;
   columns.forEach(col => {
     const safeLabel = sanitizePdfText(col.label);
-    const tracking = col.align === 'right' ? 0.6 : 1.0;
-    const labelWidth = trackedTextWidth(safeLabel, fonts.bold, headerSize, tracking);
+    const labelWidth = fonts.bold.widthOfTextAtSize(safeLabel, headerSize);
     const textX = col.align === 'right' ? colX + col.width - 10 - labelWidth : colX + 10;
-    drawTrackedText(page, safeLabel, textX, yTop - 17, fonts.bold, headerSize, COLORS.inkSoft, tracking);
+    page.drawText(safeLabel, { x: textX, y: yTop - 17, size: headerSize, font: fonts.bold, color: COLORS.inkSoft, characterSpacing: col.align === 'right' ? 0.6 : 1.0 });
     colX += col.width;
   });
   page.drawLine({ start: { x, y: yTop - TABLE_HEADER_HEIGHT }, end: { x: x + width, y: yTop - TABLE_HEADER_HEIGHT }, thickness: 1, color: COLORS.line });
@@ -384,7 +381,14 @@ const drawPageTitle = (
   options: TitleOptions = {},
 ) => {
   const topY = PAGE.height - PAGE.marginTop;
-  drawTrackedText(page, 'MONIEZI TAX PREP PACKAGE', PAGE.marginX, topY, fonts.kicker, 10.8, COLORS.blue, 1.1);
+  page.drawText('MONIEZI TAX PREP PACKAGE', {
+    x: PAGE.marginX,
+    y: topY,
+    size: 10.8,
+    font: fonts.kicker,
+    color: COLORS.blue,
+    characterSpacing: 1.1,
+  });
 
   const titleSize = options.titleSize ?? 26;
   const titleWidth = options.titleWidth ?? CONTENT_WIDTH;
@@ -823,7 +827,14 @@ const drawReportPageTitle = (
   options: TitleOptions = {},
 ) => {
   const topY = PAGE.height - PAGE.marginTop;
-  drawTrackedText(page, sanitizePdfText(kicker), PAGE.marginX, topY, fonts.kicker, 10.8, COLORS.blue, 1.1);
+  page.drawText(sanitizePdfText(kicker), {
+    x: PAGE.marginX,
+    y: topY,
+    size: 10.8,
+    font: fonts.kicker,
+    color: COLORS.blue,
+    characterSpacing: 1.1,
+  });
 
   const titleSize = options.titleSize ?? 26;
   const titleWidth = options.titleWidth ?? CONTENT_WIDTH;
@@ -1105,13 +1116,13 @@ export async function generateProfitLossPdfBytes(data: ProfitLossPdfData): Promi
   const revenueCardHeight = SECTION_HEADER_HEIGHT + TABLE_HEADER_HEIGHT + measureTableRowsHeight(revenueTableRows, fonts, labelWidthP2) + 20;
   const revenueBodyTop = drawSectionCard(page2, PAGE.marginX, y, CONTENT_WIDTH, revenueCardHeight, '2', 'Revenue & Gross Profit Detail', 'Sales categories, refunds, direct costs, and the resulting gross profit position.', fonts);
   page2.drawRectangle({ x: PAGE.marginX, y: revenueBodyTop - TABLE_HEADER_HEIGHT, width: CONTENT_WIDTH, height: TABLE_HEADER_HEIGHT, color: COLORS.panel });
-  drawTrackedText(page2, 'ACCOUNT', PAGE.marginX + 10, revenueBodyTop - 17, fonts.bold, 7.8, COLORS.inkSoft, 1.0);
+  page2.drawText('ACCOUNT', { x: PAGE.marginX + 10, y: revenueBodyTop - 17, size: 7.8, font: fonts.bold, color: COLORS.inkSoft, characterSpacing: 1.0 });
   const amountLabel = 'AMOUNT';
-  const amountLabelWidth = trackedTextWidth(amountLabel, fonts.bold, 7.8, 0.6);
-  drawTrackedText(page2, amountLabel, PAGE.marginX + labelWidthP2 + amountWidthP2 - 10 - amountLabelWidth, revenueBodyTop - 17, fonts.bold, 7.8, COLORS.inkSoft, 0.6);
+  const amountLabelWidth = fonts.bold.widthOfTextAtSize(amountLabel, 7.8);
+  page2.drawText(amountLabel, { x: PAGE.marginX + labelWidthP2 + amountWidthP2 - 10 - amountLabelWidth, y: revenueBodyTop - 17, size: 7.8, font: fonts.bold, color: COLORS.inkSoft, characterSpacing: 0.6 });
   const shareLabel = '% REV';
-  const shareLabelWidth = trackedTextWidth(shareLabel, fonts.bold, 7.8, 0.6);
-  drawTrackedText(page2, shareLabel, PAGE.marginX + labelWidthP2 + amountWidthP2 + shareWidthP2 - 10 - shareLabelWidth, revenueBodyTop - 17, fonts.bold, 7.8, COLORS.inkSoft, 0.6);
+  const shareLabelWidth = fonts.bold.widthOfTextAtSize(shareLabel, 7.8);
+  page2.drawText(shareLabel, { x: PAGE.marginX + labelWidthP2 + amountWidthP2 + shareWidthP2 - 10 - shareLabelWidth, y: revenueBodyTop - 17, size: 7.8, font: fonts.bold, color: COLORS.inkSoft, characterSpacing: 0.6 });
   drawTableRows(page2, PAGE.marginX, revenueBodyTop - TABLE_HEADER_HEIGHT, CONTENT_WIDTH, revenueTableRows, fonts, { labelWidth: labelWidthP2, amountWidth: amountWidthP2, shareWidth: shareWidthP2 });
   const takeawayTop = y - revenueCardHeight - 18;
   const takeawayText = 'This page summarizes how much gross sales were recorded, how much revenue was reduced by refunds, what direct costs were captured, and the resulting gross profit for the selected reporting window.';
@@ -1146,9 +1157,9 @@ export async function generateProfitLossPdfBytes(data: ProfitLossPdfData): Promi
   const expenseCardHeight = SECTION_HEADER_HEIGHT + TABLE_HEADER_HEIGHT + measureTableRowsHeight(expenseTableRows, fonts, labelWidthP3) + 20;
   const expenseBodyTop = drawSectionCard(page3, PAGE.marginX, y, CONTENT_WIDTH, expenseCardHeight, '3', 'Operating Expense Breakdown', 'Top operating expense categories by dollar amount and category share.', fonts);
   page3.drawRectangle({ x: PAGE.marginX, y: expenseBodyTop - TABLE_HEADER_HEIGHT, width: CONTENT_WIDTH, height: TABLE_HEADER_HEIGHT, color: COLORS.panel });
-  drawTrackedText(page3, 'EXPENSE CATEGORY', PAGE.marginX + 10, expenseBodyTop - 17, fonts.bold, 7.8, COLORS.inkSoft, 1.0);
-  drawTrackedText(page3, 'AMOUNT', PAGE.marginX + labelWidthP3 + amountWidthP3 - 10 - trackedTextWidth('AMOUNT', fonts.bold, 7.8, 0.6), expenseBodyTop - 17, fonts.bold, 7.8, COLORS.inkSoft, 0.6);
-  drawTrackedText(page3, 'SHARE', PAGE.marginX + labelWidthP3 + amountWidthP3 + shareWidthP3 - 10 - trackedTextWidth('SHARE', fonts.bold, 7.8, 0.6), expenseBodyTop - 17, fonts.bold, 7.8, COLORS.inkSoft, 0.6);
+  page3.drawText('EXPENSE CATEGORY', { x: PAGE.marginX + 10, y: expenseBodyTop - 17, size: 7.8, font: fonts.bold, color: COLORS.inkSoft, characterSpacing: 1.0 });
+  page3.drawText('AMOUNT', { x: PAGE.marginX + labelWidthP3 + amountWidthP3 - 10 - fonts.bold.widthOfTextAtSize('AMOUNT', 7.8), y: expenseBodyTop - 17, size: 7.8, font: fonts.bold, color: COLORS.inkSoft, characterSpacing: 0.6 });
+  page3.drawText('SHARE', { x: PAGE.marginX + labelWidthP3 + amountWidthP3 + shareWidthP3 - 10 - fonts.bold.widthOfTextAtSize('SHARE', 7.8), y: expenseBodyTop - 17, size: 7.8, font: fonts.bold, color: COLORS.inkSoft, characterSpacing: 0.6 });
   drawTableRows(page3, PAGE.marginX, expenseBodyTop - TABLE_HEADER_HEIGHT, CONTENT_WIDTH, expenseTableRows, fonts, { labelWidth: labelWidthP3, amountWidth: amountWidthP3, shareWidth: shareWidthP3 });
   drawFooter(page3, 'MONIEZI Pro Finance | Generated privately from your local business records.', `${businessName} | P&L | ${data.periodLabel}`, fonts, 'Page 3 of 4');
 
@@ -1177,8 +1188,8 @@ export async function generateProfitLossPdfBytes(data: ProfitLossPdfData): Promi
 
   const otherBodyTop = drawSectionCard(page4, PAGE.marginX, topSectionY, splitWidth, otherCardHeight, '4', 'Other Income / Expense', 'Below-the-line items that sit outside core operating activity.', fonts);
   page4.drawRectangle({ x: PAGE.marginX, y: otherBodyTop - TABLE_HEADER_HEIGHT, width: splitWidth, height: TABLE_HEADER_HEIGHT, color: COLORS.panel });
-  drawTrackedText(page4, 'ACCOUNT', PAGE.marginX + 10, otherBodyTop - 17, fonts.bold, 7.8, COLORS.inkSoft, 1.0);
-  drawTrackedText(page4, 'AMOUNT', PAGE.marginX + splitWidth - 10 - trackedTextWidth('AMOUNT', fonts.bold, 7.8, 0.6), otherBodyTop - 17, fonts.bold, 7.8, COLORS.inkSoft, 0.6);
+  page4.drawText('ACCOUNT', { x: PAGE.marginX + 10, y: otherBodyTop - 17, size: 7.8, font: fonts.bold, color: COLORS.inkSoft, characterSpacing: 1.0 });
+  page4.drawText('AMOUNT', { x: PAGE.marginX + splitWidth - 10 - fonts.bold.widthOfTextAtSize('AMOUNT', 7.8), y: otherBodyTop - 17, size: 7.8, font: fonts.bold, color: COLORS.inkSoft, characterSpacing: 0.6 });
   drawTableRows(page4, PAGE.marginX, otherBodyTop - TABLE_HEADER_HEIGHT, splitWidth, otherTableRows, fonts, { labelWidth: splitWidth - 120, amountWidth: 120, shareWidth: 0 });
 
   const checksBodyTop = drawSectionCard(page4, PAGE.marginX + splitWidth + splitGap, topSectionY, splitWidth, checksCardHeight, '5', 'Statement Checks Before Handoff', 'Items to confirm before handing this statement to your accountant or reviewer.', fonts);
@@ -1212,7 +1223,7 @@ export async function generateProfitLossPdfBytes(data: ProfitLossPdfData): Promi
 
   const finalTop = statsTop - 82;
   page4.drawRectangle({ x: PAGE.marginX, y: finalTop - 82, width: CONTENT_WIDTH, height: 82, color: COLORS.ink });
-  drawTrackedText(page4, 'FINAL RESULT', PAGE.marginX + 18, finalTop - 20, fonts.bold, 9, COLORS.panelBorder, 1.4);
+  page4.drawText('FINAL RESULT', { x: PAGE.marginX + 18, y: finalTop - 20, size: 9, font: fonts.bold, color: COLORS.panelBorder, characterSpacing: 1.4 });
   page4.drawText('Net Income', { x: PAGE.marginX + 18, y: finalTop - 52, size: 22, font: fonts.bold, color: COLORS.white });
   page4.drawText('After direct costs, operating expenses, and other income or expense.', { x: PAGE.marginX + 18, y: finalTop - 68, size: 8.5, font: fonts.body, color: COLORS.panelBorder });
   const finalValue = formatAccountingCurrency(data.currencySymbol, data.netIncome);

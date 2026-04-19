@@ -1,5 +1,5 @@
-import { runMileageDraftTests } from "./mileageDraft.test.js";
-import { runHashRoutingTests } from "./hashRouting.test.js";
+import { runMileageDraftTests } from "./mileageDraft.test";
+import { runHashRoutingTests } from "./hashRouting.test";
 
 runMileageDraftTests();
 runHashRoutingTests();
